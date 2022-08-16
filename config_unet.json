@@ -1,0 +1,108 @@
+{
+    "name": "SDDM2_UNetModified",
+    "n_gpu": 1,
+    "arch": {
+        "type": "SDDM",
+        "args": {
+            "noise_condition": "sqrt_alpha_bar",
+            "p_transition": "original",
+            "q_transition": "original"
+        }
+    },
+
+    "diffusion": {
+        "type": "GaussianDiffusion",
+        "args": {
+            "schedule": "linear",
+            "n_timestep": 2000,
+            "linear_start": 1e-6,
+            "linear_end": 0.01
+        }
+    },
+    "network": {
+        "type": "UNetModified",
+        "args": {
+            "in_channel": 6,
+            "out_channel": 3,
+            "inner_channel": 32,
+            "norm_groups": 32,
+            "channel_mults": [1,2,4,8,8],
+            "attn_layer": [4],
+            "res_blocks": 3,
+            "dropout": 0.2
+        }
+    },
+
+    "tr_dataset": {
+        "type": "LRHRDataset",
+        "args":{
+            "dataroot": "data/ffhq_16_128",
+            "datatype": "img",
+            "l_resolution": 16,
+            "r_resolution": 128,
+            "data_len": -1,
+            "split": "train",
+            "need_LR": false
+        }
+    },
+    "val_dataset": {
+        "type": "LRHRDataset",
+        "args":{
+            "dataroot": "data/ffhq_16_128",
+            "datatype": "img",
+            "l_resolution": 16,
+            "r_resolution": 128,
+            "data_len": -1,
+            "split": "train",
+            "need_LR": false
+        }
+    },
+
+    "infer_dataset": {
+        "type": "LRHRDataset",
+        "args":{
+            "dataroot": "data/ffhq_16_128",
+            "datatype": "img",
+            "l_resolution": 16,
+            "r_resolution": 128,
+            "data_len": -1,
+            "split": "train",
+            "need_LR": false
+        }
+    },
+    "data_loader": {
+        "type": "DataLoader",
+        "args":{
+            "batch_size": 8,
+            "shuffle": true,
+            "num_workers": 4
+        }
+    },
+    "optimizer": {
+        "type": "Adam",
+        "args":{
+            "lr": 0.0001,
+            "weight_decay": 0,
+            "amsgrad": true
+        }
+    },
+    "loss": "l1_loss",
+    "metrics": [
+        "psnr"
+    ],
+    "trainer": {
+        "epochs": 700,
+
+        "save_dir": "saved/",
+        "save_period": 50,
+        "valid_period": 50,
+        "verbosity": 2,
+        "n_valid_data_batch": 1,
+        "log_step": 100,
+        
+        "monitor": "min val_loss",
+        "early_stop": -1,
+
+        "tensorboard": true
+    }
+}

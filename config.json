@@ -1,0 +1,76 @@
+{
+    "name": "SDDM2_DenoiseWaveGrad2",
+    "n_gpu": 0,
+    "sample_rate": 16000,
+    "arch": {
+        "type": "SDDM",
+        "args": {}
+    },
+
+    "diffusion": {
+        "type": "GaussianDiffusion",
+        "args": {
+            "schedule": "linear",
+            "n_timestep": 1000,
+            "linear_start": 1e-6,
+            "linear_end": 0.01
+        }
+    },
+    "network": {
+        "type": "DenoiseWaveGrad2",
+        "args": {
+        }
+    },
+
+    "tr_dataset": {
+        "type": "AudioDataset",
+        "args":{
+            "data_root": "data/Voicebank-DEMAND/train_28spk",
+            "T": 7168 ,
+            "datatype": ".wav"
+        }
+    },
+    "val_dataset": {
+        "type": "AudioDataset",
+        "args":{
+            "data_root": "data/Voicebank-DEMAND/test",
+            "T": 7168,
+            "datatype": ".wav"
+        }
+    },
+    "data_loader": {
+        "type": "AudioDataLoader",
+        "args":{
+            "batch_size": 8,
+            "shuffle": true,
+            "validation_split": 0.0,
+            "num_workers": 2
+        }
+    },
+    "optimizer": {
+        "type": "Adam",
+        "args":{
+            "lr": 0.002,
+            "weight_decay": 0,
+            "amsgrad": true
+        }
+    },
+    "loss": "l1_loss",
+    "metrics": [
+        "sisnr"
+    ],
+    "trainer": {
+        "epochs": 100,
+
+        "save_dir": "saved/",
+        "save_period": 1,
+        "verbosity": 2,
+        "n_valid_data_batch": 1,
+        "log_step": 10,
+        
+        "monitor": "min val_loss",
+        "early_stop": -1,
+
+        "tensorboard": true
+    }
+}
