@@ -149,6 +149,7 @@ class Trainer(BaseTrainer):
 
                 # infer from noisy conditional input only
                 output = self.model.infer(condition)
+
                 loss = self.criterion(output, target)
                 self.writer.set_step((epoch - 1) * len(self.valid_data_loader) + batch_idx, 'valid')
                 self.valid_metrics.update('loss', loss.item())

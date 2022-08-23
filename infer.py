@@ -1,41 +1,34 @@
 import argparse
 import torch
-import torchaudio
 from tqdm import tqdm
-import data_loader.data_loaders as module_data
-# import data_loader.numpy_dataset as module_data
+import data_loader.LRHR_dataset as module_data
 import model.loss as module_loss
 import model.metric as module_metric
 import model.model as module_arch
 
 import model.diffusion as module_diffusion
 import model.network as module_network
-from evaluate_results import evaluate
 
 from parse_config import ConfigParser
+from trainer.trainer import tensor2img, save_img
 
 torch.backends.cudnn.benchmark = True
-from prepare_logaudio import log_modulus_normalize_reverse
 
 def main(config):
 
-    expand_order = 3
-
     logger = config.get_logger('infer')
-
     # setup data_loader instances
-    datatype = config['infer_dataset']['args']['datatype']
-    sample_rate = config['sample_rate']
 
-    infer_dataset = config.init_obj('infer_dataset', module_data, sample_rate=sample_rate, T=config['num_samples'] )
-    infer_data_loader = config.init_obj('infer_data_loader', module_data, infer_dataset)
+    infer_dataset = config.init_obj('infer_dataset', module_data )
+    infer_data_loader = config.init_obj('data_loader', module_data, infer_dataset)
 
     logger.info('Finish initializing datasets')
 
     # build model architecture
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
     diffusion = config.init_obj('diffusion', module_diffusion, device=device)
-    network = config.init_obj('network', module_network, num_samples=config['num_samples'])
+    network = config.init_obj('network', module_network)
     model = config.init_obj('arch', module_arch, diffusion, network)
     # prepare model for testing
     model = model.to(device)
@@ -49,8 +42,6 @@ def main(config):
     if config['n_gpu'] > 1:
         model = torch.nn.DataParallel(model)
     model.load_state_dict(state_dict)
-
-
 
     # get function handles of loss and metrics
     loss_fn = getattr(module_loss, config['loss'])
@@ -73,51 +64,19 @@ def main(config):
             target, condition = target.to(device), condition.to(device)
 
             # infer from conditional input only
-
             output = model.infer(condition)
 
-            # save samples, or do something with output here
-
-            real_batch_size = target.shape[0]
-            batch_index_temp = []
-            previous_index = -1
-            for b in range(real_batch_size):
-                ind = index[b]
-                if ind == previous_index:
-                    batch_index_temp.append(b)
-                    continue
-                else:
-                    if previous_index > -1:
-                        name = infer_dataset.getName(previous_index)
-                        # stack back to full audio
-                        output_one_file = output[batch_index_temp, :, :].reshape(1, -1).cpu()
-                        target_one_file = target[batch_index_temp, :, :].reshape(1, -1).cpu()
-                        condition_one_file = condition[batch_index_temp, :, :].reshape(1, -1).cpu()
-
-                        if datatype == '.wav':
-                            torchaudio.save(output_path/f'{name}.wav',
-                                            output_one_file, sample_rate)
-                            torchaudio.save(target_path/f'{name}.wav',
-                                            target_one_file, sample_rate)
-                            torchaudio.save(condition_path/f'{name}.wav',
-                                            condition_one_file, sample_rate)
-                        elif datatype == '.logwav.npy':
-                            # reverse log modulus
-                            output_one_file = log_modulus_normalize_reverse(output_one_file, expand_order)
-                            target_one_file = log_modulus_normalize_reverse(target_one_file, expand_order)
-                            condition_one_file = log_modulus_normalize_reverse(condition_one_file, expand_order)
-
-
-                            torchaudio.save(output_path/f'{name}.wav',
-                                            output_one_file, sample_rate)
-                            torchaudio.save(target_path/f'{name}.wav',
-                                            target_one_file, sample_rate)
-                            torchaudio.save(condition_path/f'{name}.wav',
-                                            condition_one_file, sample_rate)
-
-
-                    batch_index_temp = [b]
-                    previous_index = ind
+            # save the infer output
+            for b in range(condition.shape[0]):
+                output_img = tensor2img(output[b].squeeze())  # uint8
+                target_img = tensor2img(target[b].squeeze())  # uint8
+                condition_img = tensor2img(condition[b].squeeze())  # uint8
+                save_img(
+                    target_img, target_path / '{}.png'.format(index[b]))
+                save_img(
+                    condition_img, condition_path / '{}.png'.format(index[b]))
+                save_img(
+                    output_img, output_path / '{}.png'.format(index[b]))
 
 
             # computing loss, metrics on test set
@@ -127,10 +86,6 @@ def main(config):
 
     log = {'loss': total_loss / n_samples}
     logger.info(log)
-
-    # evaluate results
-    metrics = {'pesq_wb', 'sisnr', 'stoi'}
-    evaluate(sample_path, '.wav', sample_rate, metrics, logger)
 
 
 if __name__ == '__main__':
